@@ -1,0 +1,42 @@
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: trivy-postgres
+    environment:
+      POSTGRES_USER: trivy
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: trivydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trivy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  trivy-server:
+    image: aquasec/trivy:0.69.1
+    container_name: trivy-server
+    command: server --listen 0.0.0.0:4954
+    ports:
+      - "4954:4954"
+    # healthcheck можно добавить позже при необходимости
+
+  backend:
+    build: .
+    container_name: trivy-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://trivy:secret@postgres:5432/trivydb?sslmode=disable
+      TRIVY_SERVER_URL: http://trivy-server:4954
+    ports:
+      - "8080:8080"
+    restart: on-failure   # добавим, чтобы при сбое перезапускался
+
+volumes:
+  pgdata:
