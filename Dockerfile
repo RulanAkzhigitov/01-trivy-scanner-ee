@@ -10,16 +10,20 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./cmd/server
 
-# ---------- STAGE 2: runtime ----------
+# ---------- STAGE 2: trivy binary ----------
+FROM aquasec/trivy:0.69.1 AS trivy
+
+# ---------- STAGE 3: runtime ----------
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates wget
+RUN apk add --no-cache ca-certificates
 
-# Устанавливаем Trivy CLI (официальный бинарник)
-RUN wget -qO- https://github.com/aquasecurity/trivy/releases/download/v0.69.1/trivy_0.69.1_Linux-64bit.tar.gz | tar -xz -C /usr/local/bin trivy
+# Копируем trivy из официального образа
+COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 
 WORKDIR /app
 
+# Копируем бинарник из builder (ВАЖНО: путь должен совпадать)
 COPY --from=builder /app/server /app/server
 
 EXPOSE 8080

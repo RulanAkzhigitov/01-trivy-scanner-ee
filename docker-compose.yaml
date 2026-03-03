@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:15
@@ -16,6 +15,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - trivy-network
 
   trivy-server:
     image: aquasec/trivy:0.69.1
@@ -23,7 +24,8 @@ services:
     command: server --listen 0.0.0.0:4954
     ports:
       - "4954:4954"
-    # healthcheck можно добавить позже при необходимости
+    networks:
+      - trivy-network
 
   backend:
     build: .
@@ -36,7 +38,25 @@ services:
       TRIVY_SERVER_URL: http://trivy-server:4954
     ports:
       - "8080:8080"
-    restart: on-failure   # добавим, чтобы при сбое перезапускался
+    restart: on-failure
+    networks:
+      - trivy-network
+
+  frontend:
+    build: ./trivy-ui
+    container_name: trivy-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8080/api/v1
+    networks:
+      - trivy-network
+
+networks:
+  trivy-network:
+    driver: bridge
 
 volumes:
   pgdata:
